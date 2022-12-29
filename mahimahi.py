@@ -5,6 +5,7 @@ import subprocess
 
 PARENT_DIR = '/home/zhangwei/code'
 RESULT_DIR = f'{PARENT_DIR}/result'
+COMPLETE_COUNT = 0
 
 def parse_sites():
     sites = []
@@ -16,34 +17,48 @@ def parse_sites():
     return sites
 
 
-def clear(site):
+def reset_dir(site):
     os.system(f'rm -rf {RESULT_DIR}/{site}')
+    os.system(f'mkdir {RESULT_DIR}/{site}')
 
 def record_site(site):
-    clear(site)
-    cmd = """
-    mm-webrecord {result_dir}/{site} chromium-browser --test-type --ignore-privacy-errors --ignore-certificate-errors --ignore-ssl-errors --window-size=390,844 --user-data-dir=/tmp/nonexistent$(date +%s%N) {site} """.format(**{'result_dir': RESULT_DIR,'site': site}).strip()
+    global COMPLETE_COUNT
+    reset_dir(site)
+    cmd = f'mm-webrecord {RESULT_DIR}/{site}/webrecord python3 {PARENT_DIR}/screen_shot.py {site} screenshot'
     p = subprocess.Popen(cmd,shell=True)
-    print(p.pid)
-    try:
-        p.communicate(timeout=20)
-    except:
-        p.kill()
-    #    clear_process()
+    p.wait()
+    COMPLETE_COUNT += 1
+    print(f'complete {site} {COMPLETE_COUNT}')
+
+def replay_site(site):
+    cmd = f'mm-webreplay {RESULT_DIR}/{site}/webrecord mm-deplay 100 mm-loss uplink 0.1 python3 {PARENT_DIR}/screen_shot.py {site}'
 
 def clear_process():
     clear_cmd = '''
     ps -aux | grep mm-webrecord | grep -v grep | awk '{print $2}' | xargs kill
     '''
     subprocess.run(clear_cmd,shell=True)
+
+import os
+
+def getFileSize(filePath, size=0):
+    for root, dirs, files in os.walk(filePath):
+        for f in files:
+            size += os.path.getsize(os.path.join(root, f))
+            # print(f)
+    return size/1024
+
+
 def record_site_list(sites):
     subprocess_list = []
     for site in sites:
-        subprocess_list.append(record_site(site))
+        size = getFileSize('result/' + site)
+        if size < 100:
+            subprocess_list.append(record_site(site))
 
 def main():
     sites = parse_sites()
-    sites = sites[:10]
+    sites = sites[:20000]
     record_site_list(sites)
 
 if __name__ == '__main__':
